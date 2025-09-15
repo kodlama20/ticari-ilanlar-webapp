@@ -3,161 +3,111 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Stage 9 · İlan Arama (Mini Launch)</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#0b0c10; color:#e5e7eb; }
-    header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#111827; position:sticky; top:0; z-index:10; }
-    header h1 { margin:0; font-size:16px; }
-    .btn { padding:8px 12px; border-radius:12px; background:#1f2937; color:#fff; border:1px solid #2d3748; cursor:pointer; }
-    .row { display:flex; gap:12px; padding:12px 16px; }
-    .col { flex:1; background:#0f172a; border:1px solid #1f2937; border-radius:16px; padding:12px; }
-    textarea { width:100%; min-height:90px; padding:10px; border-radius:12px; border:1px solid #374151; background:#111827; color:#e5e7eb; }
-    input, select { width:100%; padding:8px; border-radius:10px; border:1px solid #374151; background:#111827; color:#e5e7eb; }
-    .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
-    .chip { background:#111827; border:1px solid #374151; border-radius:999px; padding:6px 10px; font-size:12px; }
-    table { width:100%; border-collapse:collapse; }
-    th, td { padding:8px; border-bottom:1px solid #1f2937; }
-    th { text-align:left; color:#9ca3af; }
-    .muted { color:#9ca3af; }
-    .nowrap { white-space:nowrap; }
-    footer { padding:12px 16px; color:#9ca3af; }
-
-    /* Small helpers for the added toolbar */
-    .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .toolbar input[type="text"] { min-width:240px; flex:1; }
-    .toolbar select { width:auto; }
-    .panel { background:#0f172a; border:1px solid #1f2937; border-radius:16px; padding:12px; margin:12px 16px; }
-    .danger { color:#fda4af; }
-  </style>
+  <title>Helpbot Search</title>
+  <link rel="stylesheet" href="./styles.css" />
   <link rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0c10'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='28' fill='%23e5e7eb'%3ES9%3C/text%3E%3C/svg%3E">
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0c10'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='28' fill='%23e5e7eb'%3EHB%3C/text%3E%3C/svg%3E">
 </head>
 <body>
   <header>
-    <h1>Stage 9 · İlan Arama</h1>
-    <div>
-      <span id="puter-user" class="muted" style="margin-right:8px">user info</span>
-      <button id="puter-login" class="btn">Puter.js ile oturum aç</button>
-      <button id="run-demo" class="btn">Demo Plan</button>
-      <button id="btn-agent" class="btn">Agentik Diyalog</button>
+    <div class="container">
+      <div class="row">
+        <h1>Helpbot Search</h1>
+        <div class="spacer"></div>
+        <div class="muted" id="user-info">—</div>
+        <button id="sign-in-btn"  class="btn">Giriş</button>
+        <button id="sign-out-btn" class="btn" style="display:none">Çıkış</button>
+      </div>
     </div>
   </header>
 
-  <!-- API Base controls (eklenen) -->
-  <div class="panel" style="margin-top:12px;">
-    <div class="toolbar">
-      <span class="muted">API Base</span>
-      <input id="api-base" type="url" placeholder="http://localhost:8000" style="min-width:320px;" />
-      <button id="api-save" class="btn" type="button">Kaydet</button>
-      <span id="api-ping" class="muted">—</span>
-    </div>
-  </div>
-
-  <!-- Basit sorgu formu (eklenen; main.js için) -->
-  <div class="panel">
-    <form id="ask-form" class="toolbar" onsubmit="return false;">
-      <input id="q" type="text" placeholder="Örn: İzmir 2024-01..2024-03 Kuruluş • veya: Son 2 yıl Denizli Tadilat" />
-      <button id="ask-btn" class="btn" type="submit">Ara</button>
-      <span id="status" class="muted"></span>
-    </form>
-    <div id="error" class="danger" style="min-height:1.2em; margin-top:6px;"></div>
-  </div>
-
-  <div class="row">
-    <div class="col" style="max-width:520px">
-      <h3>Sorgu</h3>
-      <textarea id="nlq" placeholder="Örnek: 2025 Ocak ayında İzmir’de şirket kuruluş ilanları, en fazla 50 kayıt"></textarea>
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <button id="btn-plan" class="btn">Planla</button>
-        <button id="btn-search" class="btn">Ara</button>
+  <main class="container stack">
+    <!-- Connection & Auth -->
+    <section class="card">
+      <h2>Bağlantı</h2>
+      <div class="controls">
+        <label>
+          API Base
+          <input id="api-base" type="text" placeholder="http://127.0.0.1:8000" />
+        </label>
+        <button id="api-save" class="btn">Kaydet</button>
+        <button id="api-ping" class="btn">Ping</button>
       </div>
-      <p class="muted" style="margin-top:8px">Planlama Puter.js (tarayıcı) ile çalışır. Oturum yoksa basit yerel kurallar devreye girer.</p>
-      <div style="margin-top:12px">
-        <label class="muted">Limit</label>
-        <input id="limit" type="number" min="1" max="1000" value="100"/>
+      <p class="muted">Sunucu sağlığı: <span id="status">—</span></p>
+    </section>
+
+    <!-- Natural Language Query -->
+    <section class="card">
+      <h2>Doğal Dil Sorgu</h2>
+      <form id="ask-form" class="stack">
+        <input id="q" type="text" placeholder="Örnek: 2024 Ocak İzmir kuruluş ilanları" />
+        <div class="row">
+          <button id="ask-btn" class="btn" type="submit">Ara</button>
+        </div>
+      </form>
+      <div id="error" class="muted" style="display:none"></div>
+    </section>
+
+    <!-- Filters & Sort (added to match main.js) -->
+    <section class="card">
+      <h2>Filtreler &amp; Sıralama</h2>
+      <div class="controls">
+        <label>
+          Metin
+          <input id="flt-text" type="text" placeholder="Metinde ara (opsiyonel)" />
+        </label>
+        <label>
+          Şirket
+          <input id="flt-company" type="text" placeholder="Şirket adı (opsiyonel)" />
+        </label>
+        <label>
+          Şehir
+          <input id="flt-city" type="text" placeholder="Şehir (opsiyonel)" />
+        </label>
+        <label>
+          Tür
+          <input id="flt-type" type="text" placeholder="İlan türü (opsiyonel)" />
+        </label>
       </div>
-    </div>
 
-    <div class="col">
-      <h3>Plan (IR)</h3>
-      <pre id="plan" style="white-space:pre-wrap; word-break:break-word; background:#0b1220; padding:10px; border-radius:12px; border:1px solid #1f2937;"></pre>
-      <div class="chips" id="chips"></div>
-    </div>
-  </div>
-
-  <!-- Agentik diyalog paneli (orijinal) -->
-  <div class="row">
-    <div class="col" style="max-width:520px">
-      <h3>Agentik Diyalog</h3>
-      <div id="dialog-transcript" style="height:160px; overflow:auto; background:#0b1220; border:1px solid #1f2937; border-radius:12px; padding:8px;"></div>
-      <div style="display:flex; gap:8px; margin-top:8px;">
-        <input id="dialog-input" placeholder="Yanıtınızı yazın…" />
-        <button id="dialog-send" class="btn">Gönder</button>
+      <div class="controls">
+        <label>
+          Tarih (Başlangıç)
+          <input id="flt-date-from" type="date" />
+        </label>
+        <label>
+          Tarih (Bitiş)
+          <input id="flt-date-to" type="date" />
+        </label>
+        <label>
+          Sırala
+          <select id="sort-by">
+            <option value="date_int">Tarih</option>
+            <option value="company">Şirket</option>
+            <option value="city">Şehir</option>
+            <option value="type">Tür</option>
+          </select>
+        </label>
+        <label>
+          Yön
+          <select id="sort-dir">
+            <option value="desc">Azalan</option>
+            <option value="asc">Artan</option>
+          </select>
+        </label>
       </div>
-      <p class="muted" style="margin-top:6px">AI, şirket adı → yıl aralığı → ilan türü sorar, sonra arama yapar.</p>
-    </div>
-    <div class="col">
-      <h3>Sonuçlar</h3>
-      <div id="results"></div>
-    </div>
-  </div>
+      <p class="muted">Not: Bu filtreler ve sıralama, mevcut sonuç kümesi üzerinde istemci tarafında uygulanır.</p>
+    </section>
 
-  <!-- Ek: Sonuç araç çubuğu + sıralama/filtreleme + sayfalama (100 varsayılan) -->
-  <div class="panel">
-    <div class="toolbar">
-      <strong>Sonuç Araçları</strong>
-      <span class="muted">Filtre:</span>
-      <input id="filter-text" type="text" placeholder="Şirket / şehir / tür / ilan no…" />
-      <span class="muted">Sırala:</span>
-      <select id="sort-by" title="Alan">
-        <option value="date_int">Tarih</option>
-        <option value="city">Şehir</option>
-        <option value="type">Tür</option>
-        <option value="company">Şirket</option>
-        <option value="ad_id">İlan No</option>
-      </select>
-      <select id="sort-dir" title="Yön">
-        <option value="desc">Azalan</option>
-        <option value="asc">Artan</option>
-      </select>
+    <!-- Results -->
+    <section class="card">
+      <h2>Sonuçlar</h2>
+      <div id="result" class="table"></div>
+      <div class="muted">Durum: <span id="status">—</span></div>
+    </section>
+  </main>
 
-      <span class="muted">Sayfa boyutu:</span>
-      <select id="page-size" title="Sayfa boyutu">
-        <option value="50">50</option>
-        <option value="100" selected>100</option>
-        <option value="200">200</option>
-      </select>
-
-      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-        <button id="prev-page" class="btn" type="button">« Önceki</button>
-        <span id="pager-info" class="muted">—</span>
-        <button id="next-page" class="btn" type="button">Sonraki »</button>
-      </div>
-    </div>
-
-    <!-- Yeni render hedefi (main.js bu ID'yi kullanır) -->
-    <div id="result" class="muted" style="margin-top:8px;">Henüz sonuç yok.</div>
-  </div>
-
-  <!-- Orijinal ilave sonuç bloğu (ID'yi benzersiz yaptık) -->
-  <div class="row">
-    <div class="col">
-      <h3>Sonuçlar</h3>
-      <div id="results2"></div>
-    </div>
-  </div>
-
-  <footer>
-    <span>Server: <span id="server-status">—</span></span>
-  </footer>
-
-  <!-- Puter SDK must load before your login logic -->
-  <script src="https://js.puter.com/v2/"></script>
-
-  <!-- Your working, tested login logic -->
-  <script src="./js/index.js"></script>
-
-  <!-- App scripts -->
-  <script type="module" src="./js/main.js"></script>
+  <!-- App script (keep your pathing) -->
+  <script type="module" src="./app/main.js"></script>
 </body>
 </html>

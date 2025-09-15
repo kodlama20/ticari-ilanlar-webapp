@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# usage:
+#   ./tools/aifix               # reads patch from STDIN
+#   pbpaste | ./tools/aifix     # macOS paste-board
+#   ./tools/aifix < fix.patch   # from file
+
+branch="ai/fix-$(date +%Y%m%d-%H%M%S)"
+title="AI fix $(date +%F %T)"
+
+# require clean working tree (so failures are easy to rollback)
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Working tree not clean. Commit or stash first." >&2
+  exit 1
+fi
+
+# capture patch to a temp file
+tmp="$(mktemp -t aifix.XXXXXX.patch)"
+cat > "$tmp"
+
+# quick dry-run
+if ! git apply --check "$tmp"; then
+  echo "Patch failed dry-run. Showing context:" >&2
+  sed -n '1,200p' "$tmp" >&2
+  exit 2
+fi
+
+git switch -c "$branch"
+git apply --index "$tmp"
+git commit -m "$title"
+
+# push & PR (requires 'gh auth login')
+git push -u origin "$branch"
+gh pr create --title "$title" --body "Automated patch apply via tools/aifix."
+echo "✅ Opened PR for $branch"

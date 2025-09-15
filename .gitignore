@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.venv/
+.env
+
+# OS/editor junk
+.DS_Store
+.idea/
+.vscode/
+
+# Build artifacts / datasets (HUGE — do not commit)
+data/
+!data/README.md
+
+# Generated indexes & shards (millions of tiny files)
+data/index/
+data/index_sharded/
+
+# Large optional lookups (keep the small code lists, ignore heavy ones)
+lookup/unvan_vocab.json
+lookup/unvan_name_to_id.json
+
+# Node stuff (if any)
+node_modules/
+dist/

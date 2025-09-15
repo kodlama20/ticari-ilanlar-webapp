@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Helpbot Search (Basic Guided Search)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f1115; --fg:#e8eaf0; --muted:#94a3b8; --card:#151822; --accent:#8ab4ff;
+      --danger:#ff7676; --ok:#86efac; --bord:#232a3a;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    header{padding:16px 20px;border-bottom:1px solid var(--bord);display:flex;gap:16px;align-items:center;position:sticky;top:0;background:rgba(15,17,21,0.9);backdrop-filter:blur(6px)}
+    h1{font-size:16px;margin:0}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .spacer{flex:1}
+    button,select,input[type="text"]{background:var(--card);color:var(--fg);border:1px solid var(--bord);border-radius:10px;padding:10px 12px;outline:none}
+    button{cursor:pointer} button.primary{background:#1f2937;border-color:#2b3447} button.primary:hover{background:#273245}
+    .muted{color:var(--muted)} .danger{color:var(--danger)} .ok{color:var(--ok)}
+    .panel{background:var(--card);border:1px solid var(--bord);border-radius:14px;padding:12px;margin:12px 0}
+    .chipbar{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 0 0}.chip{background:#0b0d12;border:1px solid var(--bord);padding:6px 10px;border-radius:999px;font-size:12px}
+    #chatlog{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;padding:4px}
+    .msg{display:flex;gap:8px}
+    .msg .bubble{padding:10px 12px;border-radius:12px;border:1px solid var(--bord)}
+    .msg.ai .bubble{background:#0b0d12}
+    .msg.user{justify-content:flex-end}
+    .msg.user .bubble{background:#111827}
+    #hits{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+    .card{border:1px solid var(--bord);border-radius:10px;padding:12px;background:#0f172a}
+    pre{margin:0;white-space:pre-wrap;word-break:break-word;background:#0b0d12;border:1px solid var(--bord);border-radius:12px;padding:10px}
+  </style>
+  <script src="https://js.puter.com/v2/"></script>
+  <script type="module" src="./index.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Helpbot Search</h1>
+    <div class="row" style="width:100%">
+      <div class="row">
+        <label class="muted" for="llm-model">Model</label>
+        <select id="llm-model" title="ChatGPT model">
+          <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+          <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+        </select>
+      </div>
+      <div class="row">
+        <label class="muted" for="api-base">API</label>
+        <input id="api-base" type="text" value="http://localhost:8000" style="width:260px" />
+        <button id="api-save">Save</button>
+        <span id="api-ping" class="muted"></span>
+      </div>
+      <div class="spacer"></div>
+      <div class="row">
+        <button id="sign-in-btn">Sign in to Puter</button>
+        <button id="sign-out-btn">Sign out</button>
+        <span id="user-info" class="muted"></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="panel">
+      <div id="chatlog"></div>
+      <form id="ask-form" class="row" style="gap:8px; margin-top:10px">
+        <input id="q" type="text" placeholder="Type your answer here…" style="min-width:300px; flex:1;" />
+        <button id="ask-btn" class="primary" type="submit">Send</button>
+        <span id="status" class="muted"></span>
+      </form>
+      <div id="error" class="danger" style="min-height:1.2em;"></div>
+    </div>
+
+    <div id="chips" class="chipbar"></div>
+
+    <div class="panel">
+      <h3 style="margin:0 0 8px 0">Answer</h3>
+      <pre id="answer"></pre>
+    </div>
+
+    <h3>Results</h3>
+    <div id="hits"></div>
+  </main>
+</body>
+</html>

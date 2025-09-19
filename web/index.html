@@ -3,111 +3,127 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Helpbot Search</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <title>İlan Arama</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#0b0c10; color:#e5e7eb; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#111827; position:sticky; top:0; z-index:10; }
+    header h1 { margin:0; font-size:16px; }
+    .btn { padding:8px 12px; border-radius:12px; background:#1f2937; color:#fff; border:1px solid #2d3748; cursor:pointer; }
+    .row { display:flex; gap:12px; padding:12px 16px; }
+    .col { flex:1; background:#0f172a; border:1px solid #1f2937; border-radius:16px; padding:12px; }
+    textarea { width:100%; min-height:90px; padding:10px; border-radius:12px; border:1px solid #374151; background:#111827; color:#e5e7eb; }
+    input, select { width:100%; padding:8px; border-radius:10px; border:1px solid #374151; background:#111827; color:#e5e7eb; }
+    .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .chip { background:#111827; border:1px solid #374151; border-radius:999px; padding:6px 10px; font-size:12px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px; border-bottom:1px solid #1f2937; }
+    th { text-align:left; color:#9ca3af; }
+    .muted { color:#9ca3af; }
+    .nowrap { white-space:nowrap; }
+    footer { padding:12px 16px; color:#9ca3af; display:flex; gap:16px; align-items:center; }
+
+    /* status lights */
+    .status { display:inline-flex; align-items:center; gap:6px; margin-right:12px; }
+    .dot { width:10px; height:10px; border-radius:50%; background:#4b5563; display:inline-block; }
+    .ok { background:#10b981; }
+    .bad { background:#ef4444; }
+    .warn { background:#f59e0b; }
+  </style>
   <link rel="icon"
-        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0c10'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='28' fill='%23e5e7eb'%3EHB%3C/text%3E%3C/svg%3E">
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0c10'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='28' fill='%23e5e7eb'%3EIA%3C/text%3E%3C/svg%3E">
 </head>
 <body>
   <header>
-    <div class="container">
-      <div class="row">
-        <h1>Helpbot Search</h1>
-        <div class="spacer"></div>
-        <div class="muted" id="user-info">—</div>
-        <button id="sign-in-btn"  class="btn">Giriş</button>
-        <button id="sign-out-btn" class="btn" style="display:none">Çıkış</button>
-      </div>
+    <h1>İlan Arama</h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <!-- API base (if front-end ayrı porta/hosta servis edilirse) -->
+      <label class="muted" for="api-base" style="font-size:12px;">API Base</label>
+      <input id="api-base" value="/" style="width:240px"/>
+      <button id="api-save" class="btn">Kaydet</button>
+      <button id="api-ping" class="btn">Ping</button>
+
+      <!-- Puter + demo knobs (puter çalışmasa da sayfa çalışır) -->
+      <span id="puter-user" class="muted" style="margin:0 8px 0 12px">—</span>
+      <button id="puter-login" class="btn">Puter ile oturum aç</button>
+      <button id="run-demo" class="btn">Demo Plan</button>
     </div>
   </header>
 
-  <main class="container stack">
-    <!-- Connection & Auth -->
-    <section class="card">
-      <h2>Bağlantı</h2>
-      <div class="controls">
-        <label>
-          API Base
-          <input id="api-base" type="text" placeholder="http://127.0.0.1:8000" />
-        </label>
-        <button id="api-save" class="btn">Kaydet</button>
-        <button id="api-ping" class="btn">Ping</button>
+  <!-- Agentik diyalog -->
+  <div class="row column">
+    <div class="col" style="max-width:520px">
+      <h3>Agentik Diyalog</h3>
+      <div id="dialog-transcript" style="height:200px; overflow:auto; background:#0b1220; border:1px solid #1f2937; border-radius:12px; padding:8px;"></div>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <input id="dialog-input" placeholder="Yanıtınızı yazın…" />
+        <button id="dialog-send" class="btn">Gönder</button>
       </div>
-      <p class="muted">Sunucu sağlığı: <span id="status">—</span></p>
-    </section>
+      <p class="muted" style="margin-top:6px">AI, şirket adı → tarih aralığı → ilan türü sorar; sonra arar.</p>
+    </div>
 
-    <!-- Natural Language Query -->
-    <section class="card">
-      <h2>Doğal Dil Sorgu</h2>
-      <form id="ask-form" class="stack">
-        <input id="q" type="text" placeholder="Örnek: 2024 Ocak İzmir kuruluş ilanları" />
-        <div class="row">
-          <button id="ask-btn" class="btn" type="submit">Ara</button>
+    <!-- Sonuçlar -->
+    <div class="col">
+      <h3>Sonuçlar</h3>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:8px">
+        <div style="flex:2; min-width:240px">
+          <label class="muted">Metin filtresi</label>
+          <input id="filter-text" placeholder="şirket/şehir/tür/ad id içinde ara" />
         </div>
-      </form>
-      <div id="error" class="muted" style="display:none"></div>
-    </section>
-
-    <!-- Filters & Sort (added to match main.js) -->
-    <section class="card">
-      <h2>Filtreler &amp; Sıralama</h2>
-      <div class="controls">
-        <label>
-          Metin
-          <input id="flt-text" type="text" placeholder="Metinde ara (opsiyonel)" />
-        </label>
-        <label>
-          Şirket
-          <input id="flt-company" type="text" placeholder="Şirket adı (opsiyonel)" />
-        </label>
-        <label>
-          Şehir
-          <input id="flt-city" type="text" placeholder="Şehir (opsiyonel)" />
-        </label>
-        <label>
-          Tür
-          <input id="flt-type" type="text" placeholder="İlan türü (opsiyonel)" />
-        </label>
-      </div>
-
-      <div class="controls">
-        <label>
-          Tarih (Başlangıç)
-          <input id="flt-date-from" type="date" />
-        </label>
-        <label>
-          Tarih (Bitiş)
-          <input id="flt-date-to" type="date" />
-        </label>
-        <label>
-          Sırala
+        <div>
+          <label class="muted">Sırala</label>
           <select id="sort-by">
-            <option value="date_int">Tarih</option>
-            <option value="company">Şirket</option>
+            <option value="date_int" selected>Tarih</option>
             <option value="city">Şehir</option>
             <option value="type">Tür</option>
+            <option value="company">Şirket</option>
+            <option value="ad_id">Ad ID</option>
           </select>
-        </label>
-        <label>
-          Yön
+        </div>
+        <div>
+          <label class="muted">Yön</label>
           <select id="sort-dir">
-            <option value="desc">Azalan</option>
+            <option value="desc" selected>Azalan</option>
             <option value="asc">Artan</option>
           </select>
-        </label>
+        </div>
+        <div>
+          <label class="muted">Sayfa boyutu</label>
+          <select id="page-size">
+            <option value="100" selected>100</option>
+            <option value="50">50</option>
+            <option value="200">200</option>
+          </select>
+        </div>
+        <div style="margin-left:auto; display:flex; gap:8px; align-items:center">
+          <button id="prev-page" class="btn">Önceki</button>
+          <span id="pager-info" class="muted">—</span>
+          <button id="next-page" class="btn">Sonraki</button>
+        </div>
       </div>
-      <p class="muted">Not: Bu filtreler ve sıralama, mevcut sonuç kümesi üzerinde istemci tarafında uygulanır.</p>
-    </section>
 
-    <!-- Results -->
-    <section class="card">
-      <h2>Sonuçlar</h2>
-      <div id="result" class="table"></div>
-      <div class="muted">Durum: <span id="status">—</span></div>
-    </section>
-  </main>
+      <div id="result"></div>
+    </div>
+  </div>
 
-  <!-- App script (keep your pathing) -->
-  <script type="module" src="./app/main.js"></script>
+  <footer>
+    <span class="status">
+      <span class="dot" id="server-dot"></span>
+      <span>Server:</span> <span id="server-status">—</span>
+    </span>
+    <span class="status">
+      <span class="dot" id="puter-dot"></span>
+      <span>Puter.js:</span> <span id="puter-status">—</span>
+    </span>
+  </footer>
+
+  <!-- Puter SDK (varsa) -->
+  <script src="https://js.puter.com/v2/"></script>
+
+  <!-- (opsiyonel) sizin başka js’iniz -->
+  <script src="./js/index.js"></script>
+
+  <!-- App scripts -->
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>

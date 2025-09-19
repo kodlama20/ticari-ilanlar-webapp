@@ -183,7 +183,10 @@ def postings(index: str, key: int) -> List[int]:
     return mono.get(str(key), [])
 
 def postings_company(key: int) -> List[int]:
-    """Robust company postings: try several index names."""
+    """
+    Be robust to different on-disk index names for company:
+    try comp_code, then company_code, then comp_name_code.
+    """
     for idx in ("comp_code", "company_code", "comp_name_code"):
         try:
             arr = postings(idx, key)
@@ -237,17 +240,13 @@ def union_sorted(a: List[int], b: List[int]) -> List[int]:
     return out
 
 def union_many(sorted_lists: List[List[int]]) -> List[int]:
-    """Union that is robust to empty shards (e.g., many days have no postings)."""
     if not sorted_lists:
         return []
-    cur: List[int] = []
-    for lst in sorted_lists:
-        if not lst:               # skip empty day lists
-            continue
+    cur = sorted_lists[0]
+    for k in range(1, len(sorted_lists)):
         if not cur:
-            cur = lst             # seed with first non-empty
-        else:
-            cur = union_sorted(cur, lst)
+            break
+        cur = union_sorted(cur, sorted_lists[k])
     return cur
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -259,8 +258,8 @@ MONTHS_TR = {
 }
 RANGE_DOTS = re.compile(r"^\s*(\d{4}-\d{2}-\d{2})\s*[.]{2}\s*(\d{4}-\d{2}-\d{2})\s*$")
 YEAR_MONTH = re.compile(r"^\s*(\d{4})-(\d{1,2})\s*$")
-YEAR_ONLY  = re.compile(r"^\s*(\d{4})\s*$")
-LAST_N_DAYS  = re.compile(r"^\s*son\s+(\d+)\s*g[uü]n\s*$", re.IGNORECASE)
+YEAR_ONLY = re.compile(r"^\s*(\d{4})\s*$")
+LAST_N_DAYS = re.compile(r"^\s*son\s+(\d+)\s*g[uü]n\s*$", re.IGNORECASE)
 LAST_N_YEARS = re.compile(r"^\s*son\s+(\d+)\s*(?:y[ıi]l|sene)\s*$", re.IGNORECASE)
 
 def date_to_sec1960(d: date) -> int:
@@ -368,11 +367,13 @@ class SearchFilters(BaseModel):
 
 class SearchIn(BaseModel):
     filters: SearchFilters
+    # server-side pagination + sorting
     page: int = 1
     page_size: int = 100
-    order_by: Optional[str] = "date_int"  # "date_int" | "ad_id" | "company" | "city" | "type"
-    order_dir: Optional[str] = "desc"      # "asc" | "desc"
-    limit: Optional[int] = None           # kept for backward compatibility
+    order_by: Optional[str] = "date_int"   # "date_int" | "ad_id" | "company" | "city" | "type"
+    order_dir: Optional[str] = "desc"       # "asc" | "desc"
+    # kept for backward compatibility (ignored when page_size is provided)
+    limit: Optional[int] = None
 
 class AnswerIn(BaseModel):
     filters: SearchFilters
@@ -382,7 +383,7 @@ class AnswerIn(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # FastAPI app + CORS
 # ──────────────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Helpbot Dataset API", version="1.3.0")
+app = FastAPI(title="Helpbot Dataset API", version="1.2.2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=False,
@@ -414,6 +415,7 @@ def health():
         "lookup_root": LOOKUP_ROOT,
         "index_root": INDEX_ROOT,
         "shards_root": SHARDS_ROOT,
+        "docmeta_exists": os.path.exists(DOCMETA_BIN),
     }
 
 @app.post("/tools/parse_date_range")
@@ -465,16 +467,18 @@ def tool_lookup_company(inp: ToolCompanyIn):
     if not raw:
         return {"status": "unmapped"}
 
-    # Accept numeric company IDs directly
+    # Accept numeric company IDs directly (e.g. "8144546")
     if raw.isdigit():
         try:
             icode = int(raw)
-            return {"status": "ok", "code": icode, "name": UNVAN_VOCAB.get(icode, "")}
         except Exception:
-            pass
+            icode = None
+        if icode is not None:
+            return {"status": "ok", "code": icode, "name": UNVAN_VOCAB.get(icode, "")}
 
     q = norm_tr(raw)
 
+    # Fast exact-name index if present
     if UNVAN_NAME_TO_ID:
         code = UNVAN_NAME_TO_ID.get(q)
         if code:
@@ -493,6 +497,7 @@ def tool_lookup_company(inp: ToolCompanyIn):
             return {"status": "ambiguous", "options": opts}
         return {"status": "unmapped"}
 
+    # Slow (vocab) fallback
     for cid, name in UNVAN_VOCAB.items():
         if norm_tr(name) == q:
             return {"status": "ok", "code": int(cid), "name": name}
@@ -508,59 +513,105 @@ def tool_lookup_company(inp: ToolCompanyIn):
     return {"status": "unmapped"}
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────────────────────────────────────
+def hydrate_row(rid: int) -> dict:
+    di, loc, typ, comp_code, adid, _ = DOCMETA.get_row(rid)
+    return {
+        "id": rid,
+        "date_int": di,
+        "loc_id": loc,
+        "type_id": typ,
+        "company_code": comp_code,
+        "ad_id": adid,
+        "company": UNVAN_VOCAB.get(comp_code, ""),
+        "city": MUDURLUK_NAMES.get(loc, str(loc)),
+        "type": ILAN_TURU_NAMES.get(typ, str(typ)),
+        "ad_link": "",
+    }
+
+# ──────────────────────────────────────────────────────────────────────────────
 # /search — server-side filter/sort/pagination
 # ──────────────────────────────────────────────────────────────────────────────
 @app.post("/search")
 def search(inp: SearchIn):
     f = inp.filters or SearchFilters()
+
     # pagination + sorting
     page = max(1, int(inp.page or 1))
-    page_size = max(1, min(200, int(inp.page_size or 100)))
+    page_size = max(1, min(200, int(inp.page_size or 100)))  # cap to keep responses sane
     order_by = (inp.order_by or "date_int").lower()
     order_dir = (inp.order_dir or "desc").lower()
 
     lists: List[Tuple[str, List[int]]] = []
+    city_list: Optional[List[int]] = None
+    type_list: Optional[List[int]] = None
+    date_list: Optional[List[int]] = None
+    comp_list: Optional[List[int]] = None
+
     need_company_post_filter = False
 
-    # City
+    # City postings
     if f.city_code is not None:
         city_list = postings("loc_id", int(f.city_code))
         lists.append(("city", city_list))
 
-    # Type
+    # Type postings
     if f.type_code is not None:
         type_list = postings("type_id", int(f.type_code))
         lists.append(("type", type_list))
 
-    # Company
-    comp_postings: List[int] = []
+    # Company postings (robust index names). If missing, we'll post-filter.
     if f.company_code is not None:
-        comp_postings = postings_company(int(f.company_code))
-        if comp_postings:
-            lists.append(("company", comp_postings))
+        comp_list = postings_company(int(f.company_code))
+        if comp_list:
+            lists.append(("company", comp_list))
         else:
-            need_company_post_filter = True  # we'll filter by comp_code during hydration
+            need_company_post_filter = True
 
-    # Date (ALWAYS include the union of day postings when a range is given)
+    # Date postings: compute keys first, then decide to include union in intersection
     have_date_range = bool(f.date_from and f.date_to)
-    date_list: Optional[List[int]] = None
+    date_keys: List[int] = []
     if have_date_range:
         try:
             date_keys = date_keys_for_range(f.date_from, f.date_to)
             day_lists = [postings("date_int", k) for k in date_keys]
-            date_list = union_many(day_lists) if day_lists else []
-            lists.append(("date", date_list))
+            est = sum(len(x) for x in day_lists)
+
+            bases = []
+            if city_list is not None: bases.append(len(city_list))
+            if type_list is not None: bases.append(len(type_list))
+            if comp_list is not None: bases.append(len(comp_list))
+
+            # Always include date union if no other list exists (date-only query),
+            # or if we need to post-filter company (to ensure we still intersect something).
+            force_include = (not bases) or need_company_post_filter
+            min_base = min(bases) if bases else est
+
+            if force_include or est <= (min_base * 4):
+                date_list = union_many(day_lists)
+                lists.append(("date", date_list))
+            else:
+                # Skip adding date_list to intersection; we'll post-filter by date range.
+                date_list = None
         except Exception:
-            # If date parsing fails, we’ll simply not add date to intersection
+            # Fall back to date post-filter only
             date_list = None
 
+    # If nothing to intersect yet and we do have a date range, include the date union now.
     if not lists:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide at least one of: city_code, type_code, company_code, or a valid date range."
-        )
+        if have_date_range:
+            if date_list is None:
+                # Compute once more (minimal fallback)
+                date_list = union_many([postings("date_int", k) for k in date_keys_for_range(f.date_from, f.date_to)])
+            lists.append(("date", date_list))
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Provide at least one of: city_code, type_code, company_code, or a valid date range."
+            )
 
-    # Intersect all non-empty lists
+    # Intersect from smallest to largest
     lists.sort(key=lambda t: len(t[1]))
     cur = lists[0][1]
     for _, arr in lists[1:]:
@@ -571,11 +622,19 @@ def search(inp: SearchIn):
         if not cur:
             break
 
-    # Collect and (optionally) post-filter by company if shard was missing
+    # Determine if we still need date post-filter
+    need_date_post_filter = have_date_range and (date_list is None)
+    if need_date_post_filter:
+        di_from = iso_to_sec1960(f.date_from)
+        di_to   = iso_to_sec1960(f.date_to)
+
+    # Collect ALL matching hits (no early break), then filter/sort/page
     hits_all: List[dict] = []
     for rid in cur:
         di, loc, typ, comp_code, adid, _ = DOCMETA.get_row(rid)
 
+        if need_date_post_filter and (di < di_from or di > di_to):
+            continue
         if need_company_post_filter and f.company_code is not None and comp_code != int(f.company_code):
             continue
 
@@ -606,8 +665,8 @@ def search(inp: SearchIn):
 
     # sorting
     keymap = {
-        "date_int": lambda h: h["date_int"],
-        "ad_id":    lambda h: h["ad_id"],
+        "date_int": lambda h: h.get("date_int", 0),
+        "ad_id":    lambda h: h.get("ad_id", 0),
         "company":  lambda h: norm_tr(h.get("company","")),
         "city":     lambda h: norm_tr(h.get("city","")),
         "type":     lambda h: norm_tr(h.get("type","")),

@@ -10,6 +10,8 @@
   --bord: #232a3a;
 }
 
+.row.column { flex-direction: column; }
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {

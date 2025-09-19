@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ticari İlanlar · Arama</title>
+
+  <!-- Your stylesheet: uses classes like .row, .panel, .chipbar, .chip, .primary, .ok, .danger, #chat -->
+  <link rel="stylesheet" href="./app/styles.css" />
+</head>
+<body>
+  <header class="row" style="align-items:center; justify-content:space-between;">
+    <h1 style="margin:0;">Ticari İlanlar · Arama</h1>
+    <div class="row auth-row" style="gap:8px; align-items:center;">
+      <span id="user-info" class="muted">Oturum yok</span>
+      <button id="sign-in-btn" class="primary">Giriş yap</button>
+      <button id="sign-out-btn" class="danger" style="display:none">Çıkış</button>
+    </div>
+  </header>
+
+  <!-- API panel (main.js expects these exact IDs) -->
+  <section class="panel">
+    <h3>Sunucu Ayarları</h3>
+    <div class="row wrap" style="gap:8px;">
+      <label for="api-base" class="muted">API Base URL</label>
+      <input id="api-base" type="text" placeholder="http://127.0.0.1:8000" />
+      <button id="api-ping" class="ok">Ping</button>
+      <button id="api-save" class="primary">Kaydet</button>
+    </div>
+    <p id="status" class="footnote muted" style="margin-top:8px">Durum: —</p>
+  </section>
+
+  <!-- Ask/search form (IDs must match main.js) -->
+  <section class="panel">
+    <h3>Sorgu</h3>
+    <form id="ask-form">
+      <textarea id="q" placeholder="Örnek: 2024-01..2024-12 İzmir Kuruluş, limit 100"></textarea>
+      <div class="row" style="gap:8px; margin-top:8px;">
+        <button id="ask-btn" type="submit" class="primary">Ara</button>
+      </div>
+    </form>
+
+    <!-- Optional quick examples (purely UI sugar; main.js doesn’t require them) -->
+    <div class="chipbar" style="margin-top:8px;">
+      <button class="chip" type="button" data-fill="2025 Ocak İzmir Kuruluş, limit 40">2025 Ocak Kuruluş</button>
+      <button class="chip" type="button" data-fill="son 30 gün Ankara tasfiye">Son 30 gün Ankara</button>
+      <button class="chip" type="button" data-fill="2023-01..2023-06 İstanbUL birleşme">2023 H1 Birleşme</button>
+    </div>
+  </section>
+
+  <!-- Results + errors -->
+  <section class="panel">
+    <h3>Sonuçlar</h3>
+    <pre id="error" class="danger" style="display:none; white-space:pre-wrap;"></pre>
+    <div id="result"></div>
+  </section>
+
+  <!-- (Optional) chat-style transcript area; styles.css has #chat rules -->
+  <section class="panel">
+    <h3>Diyalog</h3>
+    <div id="chat"></div>
+  </section>
+
+  <!-- Puter SDK must be present because main.js calls window.puter -->
+  <script src="https://js.puter.com/v2/"></script>
+
+  <!-- App logic (non-module; attaches listeners on DOMContentLoaded) -->
+  <script src="./app/main.js"></script>
+
+  <script>
+    // Tiny helper to fill textarea from chips (doesn't conflict with main.js)
+    addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.chipbar .chip[data-fill]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const v = btn.getAttribute('data-fill');
+          const ta = document.getElementById('q');
+          if (ta && v) ta.value = v;
+        });
+      });
+    });
+  </script>
+</body>
+</html>
